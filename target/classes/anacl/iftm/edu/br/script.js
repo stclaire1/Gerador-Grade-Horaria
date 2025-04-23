@@ -61,10 +61,10 @@ function renderizarTabela(populacao) {
 
     // períodos
     const trPeriodo = document.createElement("tr");
-    const thVazio1 = document.createElement("th");
-    thVazio1.rowSpan = 2;
-    thVazio1.textContent = "#";
-    trPeriodo.appendChild(thVazio1);
+    const thConflitos = document.createElement("th");
+    thConflitos.rowSpan = 2;
+    thConflitos.textContent = "Conflitos";
+    trPeriodo.appendChild(thConflitos);
 
     for (let p = 0; p < 5; p++) {
         const th = document.createElement("th");
@@ -87,16 +87,20 @@ function renderizarTabela(populacao) {
 
     // dados da população (50 possíveis grades atualmente)
     populacao.forEach((individuo, index) => {
+        const { conflitos, indicesConflitantes } = contarConflitos(individuo);
         const tr = document.createElement("tr");
         const th = document.createElement("th");
-        th.textContent = index + 1;
+        th.textContent = conflitos;
         tr.appendChild(th);
 
-        individuo.forEach(cell => {
+        individuo.forEach((celula, i) => {
             const td = document.createElement("td");
-            td.textContent = cell || "";
+            td.textContent = celula || "";
+            if (indicesConflitantes.has(i)) {
+              td.style.color = "red"; // destaca o conflito
+            }
             tr.appendChild(td);
-        });
+          });
 
         tabela.appendChild(tr);
     });
@@ -104,5 +108,35 @@ function renderizarTabela(populacao) {
     app.appendChild(tabela);
 }
 
+function contarConflitos(grade) {
+    let conflitos = 0;
+    const indicesConflitantes = new Set();
+  
+    for (let dia = 0; dia < 5; dia++) {
+      for (let h = 0; h < 4; h++) {
+        const professores = new Map();
+  
+        for (let periodo = 0; periodo < 5; periodo++) {
+          const idx = periodo * 20 + dia * 4 + h;
+          const celula = grade[idx];
+  
+          if (celula) {
+            const professor = celula.split(" ")[1];
+            if (professores.has(professor)) {
+              conflitos++;
+              // Marca todos os índices conflitantes
+              indicesConflitantes.add(idx);
+              indicesConflitantes.add(professores.get(professor));
+            } else {
+              professores.set(professor, idx);
+            }
+          }
+        }
+      }
+    }
+  
+    return { conflitos, indicesConflitantes };
+  }
+  
 const populacao = gerarPopulacao();
 renderizarTabela(populacao);

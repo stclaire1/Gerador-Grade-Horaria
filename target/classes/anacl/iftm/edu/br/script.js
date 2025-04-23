@@ -55,7 +55,7 @@ function gerarPopulacao() {
     return populacao;
 }
 
-function renderizarTabela(populacao) {
+function renderizarTabela(populacaoAvaliada) {
     const app = document.getElementById("app");
     const tabela = document.createElement("table");
 
@@ -86,14 +86,13 @@ function renderizarTabela(populacao) {
     tabela.appendChild(trDiasHorarios);
 
     // dados da população (50 possíveis grades atualmente)
-    populacao.forEach((individuo, index) => {
-        const { conflitos, indicesConflitantes } = contarConflitos(individuo);
+    populacaoAvaliada.forEach(({grade, conflitos, indicesConflitantes}) => {
         const tr = document.createElement("tr");
         const th = document.createElement("th");
         th.textContent = conflitos;
         tr.appendChild(th);
 
-        individuo.forEach((celula, i) => {
+        grade.forEach((celula, i) => {
             const td = document.createElement("td");
             td.textContent = celula || "";
             if (indicesConflitantes.has(i)) {
@@ -139,4 +138,13 @@ function contarConflitos(grade) {
   }
   
 const populacao = gerarPopulacao();
-renderizarTabela(populacao);
+
+// avalia cada grade, anexa a quantidade de conflitos e os índices conflitantes
+const populacaoAvaliada = populacao.map(grade => {
+    const { conflitos, indicesConflitantes } = contarConflitos(grade);
+    return { grade, conflitos, indicesConflitantes };
+});
+
+populacaoAvaliada.sort((a, b) => a.conflitos - b.conflitos);
+
+renderizarTabela(populacaoAvaliada);

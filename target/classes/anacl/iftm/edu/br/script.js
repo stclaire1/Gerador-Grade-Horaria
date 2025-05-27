@@ -24,7 +24,7 @@ function embaralhar(array) {
   return copia;
 }
 
-function gerarPopulacao() {
+function gerarPopulacaoInicial() {
   const populacao = [];
 
   for (let i = 0; i < 50; i++) {
@@ -49,62 +49,10 @@ function gerarPopulacao() {
       });
     }
 
-    populacao.push(individuo);
+    populacao.push({ grade: individuo, nota: null, indicesConflitantes: new Set() });
   }
 
   return populacao;
-}
-
-function renderizarTabela(populacaoAvaliada) {
-  const app = document.getElementById("app");
-  const tabela = document.createElement("table");
-
-  // períodos
-  const trPeriodo = document.createElement("tr");
-  const thConflitos = document.createElement("th");
-  thConflitos.rowSpan = 2;
-  thConflitos.textContent = "Conflitos";
-  trPeriodo.appendChild(thConflitos);
-
-  for (let p = 0; p < 5; p++) {
-    const th = document.createElement("th");
-    th.colSpan = 20;
-    th.textContent = `Período ${p + 1}`;
-    trPeriodo.appendChild(th);
-  }
-  tabela.appendChild(trPeriodo);
-
-  // horários e dias
-  const trDiasHorarios = document.createElement("tr");
-  for (let i = 0; i < 100; i++) {
-    const dia = DIAS[Math.floor((i % 20) / 4)];
-    const horario = HORARIOS[i % 4];
-    const th = document.createElement("th");
-    th.textContent = `${dia} H${horario}`;
-    trDiasHorarios.appendChild(th);
-  }
-  tabela.appendChild(trDiasHorarios);
-
-  // dados da população (50 possíveis grades atualmente)
-  populacaoAvaliada.forEach(({ grade, conflitos, indicesConflitantes }) => {
-    const tr = document.createElement("tr");
-    const th = document.createElement("th");
-    th.textContent = conflitos;
-    tr.appendChild(th);
-
-    grade.forEach((celula, i) => {
-      const td = document.createElement("td");
-      td.textContent = celula || "";
-      if (indicesConflitantes.has(i)) {
-        td.style.color = "red"; // destaca o conflito
-      }
-      tr.appendChild(td);
-    });
-
-    tabela.appendChild(tr);
-  });
-
-  app.appendChild(tabela);
 }
 
 function contarConflitos(grade) {
@@ -123,7 +71,6 @@ function contarConflitos(grade) {
           const professor = celula.split(" ")[1];
           if (professores.has(professor)) {
             conflitos++;
-            // Marca todos os índices conflitantes
             indicesConflitantes.add(idx);
             indicesConflitantes.add(professores.get(professor));
           } else {
@@ -137,38 +84,23 @@ function contarConflitos(grade) {
   return { conflitos, indicesConflitantes };
 }
 
-function selecao(populacaoAvaliada) {
-  const pai1 = populacaoAvaliada[Math.floor(Math.random() * (populacaoAvaliada.length / 2))];
-  const pai2 = populacaoAvaliada[Math.floor(Math.random() * populacaoAvaliada.length)];
-
-  const app = document.getElementById("app");
-
-  const containerPais = document.createElement("div");
-  containerPais.innerHTML = "<h2>Pais Selecionados</h2>";
-  containerPais.style.marginTop = "30px";
-
-  [pai1, pai2].forEach((pai, index) => {
-    const titulo = document.createElement("h3");
-    titulo.textContent = `Pai ${index + 1} - Conflitos: ${pai.conflitos}`;
-    containerPais.appendChild(titulo);
-
-    const tabela = document.createElement("table");
-    const tr = document.createElement("tr");
-
-    pai.grade.forEach((celula, i) => {
-      const td = document.createElement("td");
-      td.textContent = celula || "";
-      if (pai.indicesConflitantes.has(i)) {
-        td.style.color = "red";
-      }
-      tr.appendChild(td);
-    });
-
-    tabela.appendChild(tr);
-    containerPais.appendChild(tabela);
+function avaliarPopulacao(populacao) {
+  populacao.forEach(individuo => {
+    const { conflitos, indicesConflitantes } = contarConflitos(individuo.grade);
+    individuo.nota = -conflitos; // menos conflitos = nota maior
+    individuo.indicesConflitantes = indicesConflitantes;
   });
+}
 
-  app.appendChild(containerPais);
+function ordenarPopulacao(populacao) {
+  populacao.sort((a, b) => b.nota - a.nota);
+}
+
+function selecionarPais(populacao) {
+  const melhorMetade = populacao.slice(0, Math.floor(populacao.length / 2));
+  const pai1 = melhorMetade[Math.floor(Math.random() * melhorMetade.length)];
+  const pai2 = populacao[Math.floor(Math.random() * populacao.length)];
+  return [pai1, pai2];
 }
 
 function cruzamento(pai1, pai2, cortes = 2, pc = 1.0) {
@@ -177,14 +109,13 @@ function cruzamento(pai1, pai2, cortes = 2, pc = 1.0) {
   const filho2 = Array(tamanho).fill(null);
 
   if (Math.random() < pc) {
-    // gerar pontos de corte únicos entre 1 e 4
     const pontosCorte = new Set();
     while (pontosCorte.size < cortes) {
-      pontosCorte.add(Math.floor(Math.random() * 4) + 1); // 1 a 4
+      pontosCorte.add(Math.floor(Math.random() * 4) + 1);
     }
 
     const cortesOrdenados = Array.from(pontosCorte).sort((a, b) => a - b);
-    cortesOrdenados.push(5); // adiciona o final da grade como último limite
+    cortesOrdenados.push(5);
 
     let cruza = false;
     let inicio = 0;
@@ -206,29 +137,85 @@ function cruzamento(pai1, pai2, cortes = 2, pc = 1.0) {
       inicio = fim;
     }
   } else {
-    // sem cruzamento, os filhos são cópias dos pais
     for (let i = 0; i < tamanho; i++) {
       filho1[i] = pai1.grade[i];
       filho2[i] = pai2.grade[i];
     }
   }
 
-  return [filho1, filho2];
+  return [{ grade: filho1, nota: null, indicesConflitantes: new Set() }, { grade: filho2, nota: null, indicesConflitantes: new Set() }];
 }
 
-function mostrarFilhos(filhos) {
+function mutacao(filhos, pm = 0.1) {
+  filhos.forEach(filho => {
+    if (Math.random() < pm) {
+      for (let periodo = 0; periodo < 5; periodo++) {
+        const base = periodo * 20;
+
+        const embaralharInicio = Math.random() < 0.5;
+        const offset = embaralharInicio ? 0 : 10;
+
+        const inicio = base + offset;
+        const fim = inicio + 10;
+
+        const trecho = filho.grade.slice(inicio, fim);
+        const embaralhado = embaralhar(trecho);
+
+        for (let i = 0; i < 10; i++) {
+          filho.grade[inicio + i] = embaralhado[i];
+        }
+      }
+    }
+  });
+}
+
+function renderizarTabela(populacaoAvaliada) {
+  
+  populacaoAvaliada.forEach(individuo => {
+    if (!individuo.indicesConflitantes || 
+        (!Array.isArray(individuo.indicesConflitantes) && !(individuo.indicesConflitantes instanceof Set))) {
+      individuo.indicesConflitantes = new Set();
+    } else if (!(individuo.indicesConflitantes instanceof Set)) {
+      individuo.indicesConflitantes = new Set(individuo.indicesConflitantes);
+    }
+  });
+
   const app = document.getElementById("app");
-  const containerFilhos = document.createElement("div");
-  containerFilhos.innerHTML = "<h2>Filhos Gerados</h2>";
-  containerFilhos.style.marginTop = "30px";
+  app.innerHTML = "";
 
-  filhos.forEach(({ grade, conflitos, indicesConflitantes }, index) => {
-    const titulo = document.createElement("h3");
-    titulo.textContent = `Filho ${index + 1} - Conflitos: ${conflitos}`;
-    containerFilhos.appendChild(titulo);
+  const tabela = document.createElement("table");
+  tabela.style.borderCollapse = "collapse";
+  tabela.style.marginBottom = "20px";
 
-    const tabela = document.createElement("table");
+  const trPeriodo = document.createElement("tr");
+  const thConflitos = document.createElement("th");
+  thConflitos.rowSpan = 2;
+  thConflitos.textContent = "Conflitos";
+  trPeriodo.appendChild(thConflitos);
+
+  for (let p = 0; p < 5; p++) {
+    const th = document.createElement("th");
+    th.colSpan = 20;
+    th.textContent = `Período ${p + 1}`;
+    trPeriodo.appendChild(th);
+  }
+  tabela.appendChild(trPeriodo);
+
+  const trDiasHorarios = document.createElement("tr");
+  for (let i = 0; i < 100; i++) {
+    const dia = DIAS[Math.floor((i % 20) / 4)];
+    const horario = HORARIOS[i % 4];
+    const th = document.createElement("th");
+    th.textContent = `${dia} H${horario}`;
+    trDiasHorarios.appendChild(th);
+  }
+  tabela.appendChild(trDiasHorarios);
+
+  populacaoAvaliada.forEach(({ grade, nota, indicesConflitantes }) => {
     const tr = document.createElement("tr");
+    const th = document.createElement("th");
+    th.textContent = -nota;
+    tr.appendChild(th);
 
     grade.forEach((celula, i) => {
       const td = document.createElement("td");
@@ -240,70 +227,62 @@ function mostrarFilhos(filhos) {
     });
 
     tabela.appendChild(tr);
-    containerFilhos.appendChild(tabela);
   });
 
-  app.appendChild(containerFilhos);
+  app.appendChild(tabela);
 }
 
-function mutacao(filhos, pm = 0.1) {
-  filhos.forEach(filho => {
-    if (Math.random() < pm) {
-      for (let periodo = 0; periodo < 5; periodo++) {
-        const base = periodo * 20;
+function algoritmoGenetico({
+  gerarPopulacaoInicial,
+  avaliarPopulacao,
+  ordenarPopulacao,
+  selecionarPais,
+  cruzamento,
+  mutacao,
+  maxGeracoes = 100,
+  tamanhoPop = 50,
+}) {
+  let populacao = gerarPopulacaoInicial();
+  let melhorIndividuo = null;
+  let melhorNota = Number.NEGATIVE_INFINITY;
 
-        // decide aleatoriamente se vai embaralhar os 10 primeiros ou os 10 últimos
-        const embaralharInicio = Math.random() < 0.5;
-        const offset = embaralharInicio ? 0 : 10;
+  for (let geracao = 0; geracao < maxGeracoes; geracao++) {
+    avaliarPopulacao(populacao);
+    ordenarPopulacao(populacao);
 
-        const inicio = base + offset;
-        const fim = inicio + 10;
-
-        // copia os 10 horários selecionados
-        const trecho = filho.grade.slice(inicio, fim);
-        const embaralhado = embaralhar(trecho);
-
-        // atualiza na grade
-        for (let i = 0; i < 10; i++) {
-          filho.grade[inicio + i] = embaralhado[i];
-        }
-      }
+    if (populacao[0].nota > melhorNota) {
+      melhorNota = populacao[0].nota;
+      melhorIndividuo = JSON.parse(JSON.stringify(populacao[0]));
     }
-  });
 
-  return filhos;
+    const novaPopulacao = [];
+
+    // mantem o melhor indivíduo da geração atual
+    novaPopulacao.push(populacao[0]);
+
+    while (novaPopulacao.length < tamanhoPop) {
+      const [pai1, pai2] = selecionarPais(populacao);
+      const filhos = cruzamento(pai1, pai2);
+      mutacao(filhos);
+      novaPopulacao.push(...filhos);
+    }
+
+    populacao = novaPopulacao.slice(0, tamanhoPop);
+  }
+
+  return melhorIndividuo;
 }
 
-const populacao = gerarPopulacao();
-
-// avalia cada grade, anexa a quantidade de conflitos e os índices conflitantes
-const populacaoAvaliada = populacao.map(grade => {
-  const { conflitos, indicesConflitantes } = contarConflitos(grade);
-  return { grade, conflitos, indicesConflitantes };
+// executa o algoritmo e mostra resultado final
+const melhor = algoritmoGenetico({
+  gerarPopulacaoInicial: gerarPopulacaoInicial,
+  avaliarPopulacao: avaliarPopulacao,
+  ordenarPopulacao: ordenarPopulacao,
+  selecionarPais: selecionarPais,
+  cruzamento: cruzamento,
+  mutacao: mutacao,
+  maxGeracoes: 100,
+  tamanhoPop: 50,
 });
 
-populacaoAvaliada.sort((a, b) => a.conflitos - b.conflitos);
-
-renderizarTabela(populacaoAvaliada);
-selecao(populacaoAvaliada);
-
-const [pai1, pai2] = [
-  populacaoAvaliada[0], // melhor indivíduo
-  populacaoAvaliada[1], // segundo melhor (ou aleatório)
-];
-
-const [filho1, filho2] = cruzamento(pai1, pai2);
-
-mutacao([filho1, filho2], 0.1);
-
-// avalia os filhos
-const avaliados = [filho1, filho2].map(grade => {
-  const { conflitos, indicesConflitantes } = contarConflitos(grade);
-  return { grade, conflitos, indicesConflitantes };
-});
-
-const filhosAvaliados = [filho1, filho2].map(grade => {
-  const { conflitos, indicesConflitantes } = contarConflitos(grade);
-  return { grade, conflitos, indicesConflitantes };
-});
-mostrarFilhos(filhosAvaliados);
+renderizarTabela([melhor]);

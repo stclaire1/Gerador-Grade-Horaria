@@ -177,14 +177,14 @@ function cruzamento(pai1, pai2, cortes = 2, pc = 1.0) {
   const filho2 = Array(tamanho).fill(null);
 
   if (Math.random() < pc) {
-    // Gerar pontos de corte únicos entre 1 e 4
+    // gerar pontos de corte únicos entre 1 e 4
     const pontosCorte = new Set();
     while (pontosCorte.size < cortes) {
       pontosCorte.add(Math.floor(Math.random() * 4) + 1); // 1 a 4
     }
 
     const cortesOrdenados = Array.from(pontosCorte).sort((a, b) => a - b);
-    cortesOrdenados.push(5); // Adiciona o final da grade como último limite
+    cortesOrdenados.push(5); // adiciona o final da grade como último limite
 
     let cruza = false;
     let inicio = 0;
@@ -206,7 +206,7 @@ function cruzamento(pai1, pai2, cortes = 2, pc = 1.0) {
       inicio = fim;
     }
   } else {
-    // Sem cruzamento, os filhos são cópias dos pais
+    // sem cruzamento, os filhos são cópias dos pais
     for (let i = 0; i < tamanho; i++) {
       filho1[i] = pai1.grade[i];
       filho2[i] = pai2.grade[i];
@@ -246,6 +246,34 @@ function mostrarFilhos(filhos) {
   app.appendChild(containerFilhos);
 }
 
+function mutacao(filhos, pm = 0.1) {
+  filhos.forEach(filho => {
+    if (Math.random() < pm) {
+      for (let periodo = 0; periodo < 5; periodo++) {
+        const base = periodo * 20;
+
+        // decide aleatoriamente se vai embaralhar os 10 primeiros ou os 10 últimos
+        const embaralharInicio = Math.random() < 0.5;
+        const offset = embaralharInicio ? 0 : 10;
+
+        const inicio = base + offset;
+        const fim = inicio + 10;
+
+        // copia os 10 horários selecionados
+        const trecho = filho.grade.slice(inicio, fim);
+        const embaralhado = embaralhar(trecho);
+
+        // atualiza na grade
+        for (let i = 0; i < 10; i++) {
+          filho.grade[inicio + i] = embaralhado[i];
+        }
+      }
+    }
+  });
+
+  return filhos;
+}
+
 const populacao = gerarPopulacao();
 
 // avalia cada grade, anexa a quantidade de conflitos e os índices conflitantes
@@ -266,7 +294,9 @@ const [pai1, pai2] = [
 
 const [filho1, filho2] = cruzamento(pai1, pai2);
 
-// Avalia os filhos
+mutacao([filho1, filho2], 0.1);
+
+// avalia os filhos
 const avaliados = [filho1, filho2].map(grade => {
   const { conflitos, indicesConflitantes } = contarConflitos(grade);
   return { grade, conflitos, indicesConflitantes };

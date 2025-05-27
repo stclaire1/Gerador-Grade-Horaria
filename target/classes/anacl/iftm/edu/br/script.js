@@ -171,6 +171,80 @@ function selecao(populacaoAvaliada) {
   app.appendChild(containerPais);
 }
 
+function cruzamento(pai1, pai2, cortes = 2, pc = 1.0) {
+  const tamanho = 100;
+  const filho1 = Array(tamanho).fill(null);
+  const filho2 = Array(tamanho).fill(null);
+
+  if (Math.random() < pc) {
+    // Gerar pontos de corte únicos entre 1 e 4
+    const pontosCorte = new Set();
+    while (pontosCorte.size < cortes) {
+      pontosCorte.add(Math.floor(Math.random() * 4) + 1); // 1 a 4
+    }
+
+    const cortesOrdenados = Array.from(pontosCorte).sort((a, b) => a - b);
+    cortesOrdenados.push(5); // Adiciona o final da grade como último limite
+
+    let cruza = false;
+    let inicio = 0;
+
+    for (let corte of cortesOrdenados) {
+      const fim = corte * 20;
+
+      for (let i = inicio; i < fim; i++) {
+        if (cruza) {
+          filho1[i] = pai2.grade[i];
+          filho2[i] = pai1.grade[i];
+        } else {
+          filho1[i] = pai1.grade[i];
+          filho2[i] = pai2.grade[i];
+        }
+      }
+
+      cruza = !cruza;
+      inicio = fim;
+    }
+  } else {
+    // Sem cruzamento, os filhos são cópias dos pais
+    for (let i = 0; i < tamanho; i++) {
+      filho1[i] = pai1.grade[i];
+      filho2[i] = pai2.grade[i];
+    }
+  }
+
+  return [filho1, filho2];
+}
+
+function mostrarFilhos(filhos) {
+  const app = document.getElementById("app");
+  const containerFilhos = document.createElement("div");
+  containerFilhos.innerHTML = "<h2>Filhos Gerados</h2>";
+  containerFilhos.style.marginTop = "30px";
+
+  filhos.forEach(({ grade, conflitos, indicesConflitantes }, index) => {
+    const titulo = document.createElement("h3");
+    titulo.textContent = `Filho ${index + 1} - Conflitos: ${conflitos}`;
+    containerFilhos.appendChild(titulo);
+
+    const tabela = document.createElement("table");
+    const tr = document.createElement("tr");
+
+    grade.forEach((celula, i) => {
+      const td = document.createElement("td");
+      td.textContent = celula || "";
+      if (indicesConflitantes.has(i)) {
+        td.style.color = "red";
+      }
+      tr.appendChild(td);
+    });
+
+    tabela.appendChild(tr);
+    containerFilhos.appendChild(tabela);
+  });
+
+  app.appendChild(containerFilhos);
+}
 
 const populacao = gerarPopulacao();
 
@@ -184,3 +258,22 @@ populacaoAvaliada.sort((a, b) => a.conflitos - b.conflitos);
 
 renderizarTabela(populacaoAvaliada);
 selecao(populacaoAvaliada);
+
+const [pai1, pai2] = [
+  populacaoAvaliada[0], // melhor indivíduo
+  populacaoAvaliada[1], // segundo melhor (ou aleatório)
+];
+
+const [filho1, filho2] = cruzamento(pai1, pai2);
+
+// Avalia os filhos
+const avaliados = [filho1, filho2].map(grade => {
+  const { conflitos, indicesConflitantes } = contarConflitos(grade);
+  return { grade, conflitos, indicesConflitantes };
+});
+
+const filhosAvaliados = [filho1, filho2].map(grade => {
+  const { conflitos, indicesConflitantes } = contarConflitos(grade);
+  return { grade, conflitos, indicesConflitantes };
+});
+mostrarFilhos(filhosAvaliados);
